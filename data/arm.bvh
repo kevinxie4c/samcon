@@ -1,0 +1,26 @@
+HIERARCHY
+ROOT Base
+{
+    OFFSET 0 0 0
+    CHANNELS 6 Xposition Yposition Zposition Zrotation Xrotation Yrotation
+    JOINT Link1
+    {
+        OFFSET 0 50 0
+        CHANNELS 1 Xrotation
+        JOINT Link2
+        {
+            OFFSET 0 50 0
+            CHANNELS 1 Xrotation 
+            End Site
+            {
+                OFFSET 0 50 0
+            }
+        }
+	}
+}
+MOTION
+Frames:    3
+Frame Time:    0.010000
+0 0 0 0 0 0 0 0 
+0 0 0 0 0 0 0 0 
+0 0 0 0 0 0 0 0 
