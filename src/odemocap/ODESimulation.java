@@ -59,9 +59,11 @@ public class ODESimulation {
     
     private Set<DBody> nonCollidable = new HashSet<DBody>();
 
+    /*
     private DBody sphereBody;
     private DMass sphereMass;
     private DSphere sphere;
+    */
 
     private DBody boxBody;
     private DMass boxMass;
@@ -127,6 +129,7 @@ public class ODESimulation {
      * are not below the floor to start
      */
     public double floorOffset = 0.06;//-0.025;
+    //public double floorOffset = -0.05;
     
     /**
      * Creates the world for ODE and initializes objects.
@@ -376,6 +379,7 @@ public class ODESimulation {
         gl.glEnable( GL2.GL_COLOR_MATERIAL );
         gl.glColorMaterial( GL.GL_FRONT_AND_BACK, GL2.GL_AMBIENT_AND_DIFFUSE );
 
+        /*
         gl.glPushMatrix();        
         gl.glColor3f( 0.7f,0,0 );        
         setFlatMatrix( sphereBody, M );
@@ -383,6 +387,7 @@ public class ODESimulation {
         // we know it is radius 1
         EasyViewer.glut.glutSolidSphere(1, 64,32);
         gl.glPopMatrix();
+        */
         
         gl.glPushMatrix();
         gl.glColor4f(0,0,0.7f,1);
@@ -461,6 +466,7 @@ public class ODESimulation {
         // Create a sphere geometry and set it to body (dynamic object)
         // Sphere radius is 1. Position sphere above the ground
         
+    	/*
         sphereBody = OdeHelper.createBody( world );
         sphereMass = OdeHelper.createMass();
         sphereMass.setSphere( 1, 1 ); 
@@ -469,6 +475,7 @@ public class ODESimulation {
         sphereBody.setMass( sphereMass );
         sphere = OdeHelper.createSphere( space, 1 );
         sphere.setBody( sphereBody );
+        */
    
         boxBody = OdeHelper.createBody( world );
         boxMass = OdeHelper.createMass();
@@ -489,10 +496,12 @@ public class ODESimulation {
     private void setInitialObjectPositions() {
         DQuaternion q = new DQuaternion(1,0,0,0);
         
+        /*
         sphereBody.setPosition( 1,2,-1 );
         sphereBody.setQuaternion( q );
         sphereBody.setLinearVel( 0,0,0 );
         sphereBody.setAngularVel( 0,0,0 );
+        */
 
         box.setPosition( -1,2,-1 );
         box.setQuaternion( q );

@@ -29,7 +29,8 @@ public class BVHData {
      * List of skeleton nodes in the hierarchy.
      * The order of this list is important for interpreting channel data.
      */
-    private ArrayList<SkeletonNode> snodeList = new ArrayList<SkeletonNode>();
+    public ArrayList<SkeletonNode> snodeList = new ArrayList<SkeletonNode>();
+    // private ArrayList<SkeletonNode> snodeList = new ArrayList<SkeletonNode>();
 
     /**
      * Number of frames in the BVH file

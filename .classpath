@@ -5,7 +5,6 @@
 	<classpathentry kind="con" path="org.eclipse.jdt.USER_LIBRARY/vecmath"/>
 	<classpathentry kind="src" path="src"/>
 	<classpathentry kind="lib" path="ode4j.jar"/>
-	<classpathentry kind="lib" path="jogl"/>
 	<classpathentry kind="lib" path="D:/Thesis/ODE-Java-Stuff/ode4j-mocap/mintools2"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>
