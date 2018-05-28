@@ -134,7 +134,7 @@ public class ODESimulation {
      * are not below the floor to start
      */
     //public double floorOffset = 0.06;//-0.025;
-    public double floorOffset = -0.09;
+    public double floorOffset = -0.01;
     
     /**
      * Creates the world for ODE and initializes objects.

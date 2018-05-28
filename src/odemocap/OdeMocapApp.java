@@ -148,10 +148,10 @@ public class OdeMocapApp implements SceneGraphNode, Interactor {
 
 	}
 
-	int sampleNum = 1600, saveNum = 400, itNum = 40;
+	int sampleNum = 3200, saveNum = 800, itNum = 40;
 	//int sampleNum = 1, saveNum = 1, itNum = 20;
 	int groupNum = 5, samRate = 1;
-	int startFrame = 1;
+	int startFrame = 32;
 	List<State> states;
 
 	@Override
@@ -252,7 +252,7 @@ public class OdeMocapApp implements SceneGraphNode, Interactor {
 					sample.state.save(vData.snodeList);
 					State target = refStateList.get(i);
 					//sample.cost = pCost(sample.state, target);
-					sample.cost = cost(vData.snodeList, refPhyPropList.get(i));
+					sample.cost = cost(vData.snodeList, refPhyPropList.get(i)) + pCost(sample.state, target);
 					// sample.cost = 0;
 					queue.add(sample);
 					if (queue.size() > saveNum)
@@ -1158,7 +1158,13 @@ public class OdeMocapApp implements SceneGraphNode, Interactor {
 				continue;
 			b += norm(new Vector3d(v1.get0() - v2.get0(), v1.get1() - v2.get1(), v1.get2() - v2.get2()));
 		}
-		return a + 0.1 * b;
+		
+		double c = quatDist(s1.quat.get(0), s2.quat.get(0));
+		DVector3C u = s1.aVel.get(0);
+		DVector3C v = s2.aVel.get(0);
+		double d = norm(new Vector3d(u.get0() - v.get0(), u.get1() - v.get1(), u.get2() - v.get2()));
+		
+		return 5.0 * (a + 0.1 * b) / s1.quat.size() + 3.0 * (c + 0.1 * d);
 	}
 
 	double cost(List<SkeletonNode> sl, PhyProp phyProp) {
