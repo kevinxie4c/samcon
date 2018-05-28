@@ -47,6 +47,7 @@ import mintools.viewer.SceneGraphNode;
 import mintools.viewer.ShadowMap;
 
 import org.ode4j.math.*;
+import org.ode4j.ode.DBody;
 
 /**
  * Assignment 3 base application
@@ -147,10 +148,10 @@ public class OdeMocapApp implements SceneGraphNode, Interactor {
 
 	}
 
-	int sampleNum = 4000, saveNum = 1000, itNum = 40;
+	int sampleNum = 1600, saveNum = 400, itNum = 40;
 	//int sampleNum = 1, saveNum = 1, itNum = 20;
 	int groupNum = 5, samRate = 1;
-	int startFrame = 32;
+	int startFrame = 1;
 	List<State> states;
 
 	@Override
@@ -1161,19 +1162,52 @@ public class OdeMocapApp implements SceneGraphNode, Interactor {
 	}
 
 	double cost(List<SkeletonNode> sl, PhyProp phyProp) {
-		double res = 0;
+		double termA = 0;
 		int i = 0;
+		Point3d massPos = new Point3d(0, 0, 0);
+		Vector3d massVel = new Vector3d(0, 0, 0);
+		double termB = 0;
+		
 		for (SkeletonNode a: sl) {
 			if (a.odeBody == null || a.odeBody.body == null)
 				continue;
+			DBody tBody = a.odeBody.body;
+			DVector3C v1 = tBody.getPosition();
 			if (a.name.endsWith("Ankle") || a.name.endsWith("Head") || a.name.endsWith("Wrist")) {
-				DVector3C v1 = a.odeBody.body.getPosition();
 				Point3d v2 = phyProp.posList.get(i);
-				res += norm(new Vector3d(v1.get0() - v2.x, v1.get1() - v2.y, v1.get2() - v2.z));
+				termA += norm(new Vector3d(v1.get0() - v2.x, v1.get1() - v2.y, v1.get2() - v2.z));
 			}
+			
+			Point3d tPos = new Point3d(v1.get0(), v1.get1(), v1.get2());
+			tPos.scale(tBody.getMass().getMass());
+			massPos.add(tPos);
+			DVector3C tv = tBody.getLinearVel();
+			Vector3d tVel = new Vector3d(tv.get0(), tv.get1(), tv.get2());
+			tVel.scale(tBody.getMass().getMass());
+			massVel.add(tVel);
+			
 			++i;
 		}
-		return res;
+		
+		massPos.scale(1.0 / i);
+		massVel.scale(1.0 / i);
+		
+		i = 0;
+		for(SkeletonNode a: sl) {
+			if (a.odeBody == null || a.odeBody.body == null)
+				continue;
+			if (a.name.endsWith("Ankle") || a.name.endsWith("Head") || a.name.endsWith("Wrist")) {
+				DVector3C tPos = a.odeBody.body.getPosition();
+				Point3d tr = new Point3d(massPos);
+				tr.sub(new Point3d(tPos.get0(), tPos.get1(), tPos.get2()));
+				tr.y = 0;
+				tr.sub(phyProp.r.get(i));
+				termB += norm(tr);
+				++i;
+			}
+		}
+		massVel.sub(phyProp.massVel);
+		return 30.0 * termA / 5 + 10.0 * (termB / (1.6 * 5) + 0.1 * norm(massVel));
 	}
 
 	double samParaScale = 5;
@@ -1300,14 +1334,42 @@ class Sample {
 class PhyProp {
 	List<Point3d> posList = new ArrayList<Point3d>();
 	List<Double> massList = new ArrayList<Double>();
+	Point3d massPos = new Point3d(0, 0, 0);
+	List<Point3d> r = new ArrayList<Point3d>();
+	Vector3d massVel = new Vector3d(0, 0, 0);
 	
 	PhyProp(List<SkeletonNode> snlist) {
+		int i = 0;
 		for (SkeletonNode sn: snlist) {
 			if (sn.odeBody == null || sn.odeBody.body == null)
 				continue;
 			DVector3C p = sn.odeBody.body.getPosition();
 			posList.add(new Point3d(p.get0(), p.get1(), p.get2()));
-			massList.add(sn.odeBody.body.getMass().getMass());
+			double tMass = sn.odeBody.body.getMass().getMass();
+			massList.add(tMass);
+			
+			Point3d tPos = new Point3d(p.get0(), p.get1(), p.get2());
+			tPos.scale(tMass);
+			massPos.add(tPos);
+			DVector3C v = sn.odeBody.body.getLinearVel();
+			Vector3d tVel = new Vector3d(v.get0(), v.get1(), v.get2());
+			tVel.scale(tMass);
+			massVel.add(tVel);
+			++i;
+		}
+		massPos.scale(1.0 / i);
+		massVel.scale(1.0 / i);
+		
+		for (SkeletonNode a: snlist) {
+			if (a.odeBody == null || a.odeBody.body == null)
+				continue;
+			if (a.name.endsWith("Ankle") || a.name.endsWith("Head") || a.name.endsWith("Wrist")) {
+				DVector3C tPos = a.odeBody.body.getPosition();
+				Point3d tr = new Point3d(massPos);
+				tr.sub(new Point3d(tPos.get0(), tPos.get1(), tPos.get2()));
+				tr.y = 0;
+				r.add(tr);
+			}
 		}
 	}
 }
