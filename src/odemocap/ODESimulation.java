@@ -44,6 +44,7 @@ import org.ode4j.ode.DMass;
 import org.ode4j.ode.DSpace;
 import org.ode4j.ode.DSphere;
 import org.ode4j.ode.DWorld;
+import org.ode4j.ode.OdeConstants;
 import org.ode4j.ode.OdeHelper;
 
 /**
@@ -81,11 +82,14 @@ public class ODESimulation {
      * unclear documentation with respect to density parameter.
      */
     private DoubleParameter stiffnessParam = new DoubleParameter( "ball joint stiffness", 0.8, 1e-3, 1e3 );
-    private DoubleParameter dampingParam = new DoubleParameter( "ball joint damping", 0.01, 1e-3, 1e3 );   // current stiffness and damping comes from questionable masses??    
+    private DoubleParameter dampingParam = new DoubleParameter( "ball joint damping", 0.01, 1e-3, 1e3 );   // current stiffness and damping comes from questionable masses?? 
+    //private DoubleParameter stiffnessParam = new DoubleParameter( "ball joint stiffness", 2, 1e-3, 1e3 );
+    //private DoubleParameter dampingParam = new DoubleParameter( "ball joint damping", 0.01, 1e-3, 1e3 );   // current stiffness and damping comes from questionable masses??    
     private BooleanParameter applyStiffness = new BooleanParameter( "apply stiffness torques", true );
-    private BooleanParameter applyDamping = new BooleanParameter( "apply damping torques", true );    
+    private BooleanParameter applyDamping = new BooleanParameter( "apply damping torques", true );
+    
     private DoubleParameter stepSize = new DoubleParameter( "step size", 0.01, 1e-4, 0.1 );    
-    private IntParameter subSteps = new IntParameter( "substeps", 100, 1, 1000 );    
+    private IntParameter subSteps = new IntParameter( "substeps", 100, 1, 1000 );
     private BooleanParameter enableGravity = new BooleanParameter( "enable gravity", true );
     private DoubleParameter gravity = new DoubleParameter( "gravity", -9.8, -9.8, 9.8 );
     private DoubleParameter contactCFM = new DoubleParameter( "contact cfm", 0, 0, 1000 );
@@ -94,6 +98,7 @@ public class ODESimulation {
     private DoubleParameter worldERP = new DoubleParameter( "world erp", 0.2, 0.1, 1000 );
     private BooleanParameter enableContacts = new BooleanParameter( "enable contacts", true );
     private DoubleParameter friction = new DoubleParameter( "friction coefficient", 0.33, 0, 0.5 );
+    //private DoubleParameter friction = new DoubleParameter( "friction coefficient", 0.5, 0, 0.5 );
     private DoubleParameter extraVelocityScale = new DoubleParameter( "extra velocity scale (TEST)", 1, -1, 1 );
     
     /**
@@ -128,8 +133,8 @@ public class ODESimulation {
      * An amount to lower the floor so that the feet of the character defined in the bvh 
      * are not below the floor to start
      */
-    public double floorOffset = 0.06;//-0.025;
-    //public double floorOffset = -0.05;
+    //public double floorOffset = 0.06;//-0.025;
+    public double floorOffset = -0.09;
     
     /**
      * Creates the world for ODE and initializes objects.
@@ -202,6 +207,10 @@ public class ODESimulation {
         double dimz = node.geometrySize.z * scale * 2;        
         BoxBodyODE b = new BoxBodyODE( node.name, world, space, dimx, dimy, dimz, dp0, dq0 );
         node.odeBody = b;
+        if (node.name.equals("Head") || node.name.equals("neck") || node.name.endsWith("Collar")
+        		|| node.name.endsWith("Shoulder") || node.name.endsWith("Elbow")
+        		|| node.name.endsWith("Wrist"))
+        		b.mass.setMass(1);
         bodies.add(b);
         for ( SkeletonNode child : node.children ) {
             createSkeletonHelper(child);
@@ -585,9 +594,11 @@ public class ODESimulation {
         if ( collisions > 0 ) { //&contact.geom,sizeof(dContactGeom))) {
             for ( int i = 0; i < collisions; i++ ) {
                 DContact contact = contacts.get(i);
-                contact.surface.mode = 0;
+                //contact.surface.mode = 0;
+                contact.surface.mode = OdeConstants.dContactApprox1 | OdeConstants.dContactSoftCFM;
                 contact.surface.mu = friction.getValue();
-                contact.surface.mu2 = 0;
+                //contact.surface.mu2 = 0;
+                contact.surface.soft_cfm = 0.01;
                 DContactJoint c = OdeHelper.createContactJoint ( world, contactgroup, contact);
                 c.attach( b1, b2 );
                 // c.setFeedback( fbPool ); // TODO: save these in a list... 

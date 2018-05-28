@@ -140,7 +140,9 @@ public class SkeletonNode implements SceneGraphNode {
         geometrySize.z = ( geometrySize.z < size ) ? size : geometrySize.z;
         
         if (name.endsWith("Ankle"))
-        		geometrySize.z *= 2;
+        		geometrySize.z *= 1.5;
+        
+        geometrySize.x *= 0.95;
 
         for ( SkeletonNode c : children ) {
             c.init( drawable );

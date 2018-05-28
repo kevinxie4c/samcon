@@ -28,6 +28,7 @@ import javax.vecmath.Matrix3d;
 import javax.vecmath.Matrix4d;
 import javax.vecmath.Point3d;
 import javax.vecmath.Quat4d;
+import javax.vecmath.Tuple2d;
 import javax.vecmath.Tuple3d;
 import javax.vecmath.Tuple4d;
 import javax.vecmath.Vector3d;
@@ -130,7 +131,8 @@ public class OdeMocapApp implements SceneGraphNode, Interactor {
 		}
 
 		// bvhFile = "data/02_02.bvh";
-		bvhFile = "data/Cyrus_Take7.bvh";
+		//bvhFile = "data/Cyrus_Take7.bvh";
+		bvhFile = "data/walk.bvh";
 		bvhData.load(bvhFile);
 
 		// c3dData.load( c3dFile );
@@ -145,9 +147,10 @@ public class OdeMocapApp implements SceneGraphNode, Interactor {
 
 	}
 
-	int sampleNum = 5000, saveNum = 1000, itNum = 10;
-	// int sampleNum = 1, saveNum = 1, itNum = 200;
-	int groupNum = 20, samRate = 1;
+	int sampleNum = 4000, saveNum = 1000, itNum = 40;
+	//int sampleNum = 1, saveNum = 1, itNum = 20;
+	int groupNum = 5, samRate = 1;
+	int startFrame = 32;
 	List<State> states;
 
 	@Override
@@ -170,6 +173,8 @@ public class OdeMocapApp implements SceneGraphNode, Interactor {
 		 * root );
 		 */
 
+		frame.setValue(startFrame);
+		frame.setMinimum(startFrame);
 		vData.load(bvhFile);
 		vRoot = vData.root;
 		if (vRoot != null)
@@ -177,24 +182,29 @@ public class OdeMocapApp implements SceneGraphNode, Interactor {
 		odeSim.createSkeleton(vRoot, s);
 		odeSim.reset();
 		odeSim.createSkeletonJoints(vRoot);
-		vData.setSkeletonPose(0);
+		vData.setSkeletonPose(startFrame - 1);
 		vRoot.computeTransforms();
 		vRoot.copyEwfrombToPrevious();
-		vData.setSkeletonPose(0);
+		vData.setSkeletonPose(startFrame);
 		vRoot.computeTransforms();
 		odeSim.setCurrentPose(vRoot);
 		odeSim.setCurrentPoseVelocity(vRoot, 0.01);
 
-		List<State> refList = new ArrayList<State>();
-		refList.add(null);
+		List<State> refStateList = new ArrayList<State>();
+		List<PhyProp> refPhyPropList= new ArrayList<PhyProp>();
+		
+		refStateList.add(null);
+		refPhyPropList.add(null);
 		for (int i = 1; i < itNum; ++i) {
 			State tmp = new State();
-			vData.setSkeletonPose(i * groupNum);
+			vData.setSkeletonPose(startFrame + i * groupNum);
+			//vData.setSkeletonPose(0);
 			vRoot.computeTransforms();
 			odeSim.setCurrentPose(vRoot);
 			odeSim.setCurrentPoseVelocity(vRoot, 0.01);
 			tmp.save(vData.snodeList);
-			refList.add(tmp);
+			refStateList.add(tmp);
+			refPhyPropList.add(new PhyProp(vData.snodeList));
 		}
 
 		/*
@@ -202,10 +212,10 @@ public class OdeMocapApp implements SceneGraphNode, Interactor {
 		 * vRoot.init(drawable); odeSim.createSkeleton( vRoot, s ); odeSim.reset();
 		 * odeSim.createSkeletonJoints( vRoot );
 		 */
-		vData.setSkeletonPose(0);
+		vData.setSkeletonPose(startFrame - 1);
 		vRoot.computeTransforms();
 		vRoot.copyEwfrombToPrevious();
-		vData.setSkeletonPose(0);
+		vData.setSkeletonPose(startFrame);
 		vRoot.computeTransforms();
 		odeSim.setCurrentPose(vRoot);
 		odeSim.setCurrentPoseVelocity(vRoot, 0.01);
@@ -223,17 +233,25 @@ public class OdeMocapApp implements SceneGraphNode, Interactor {
 			PriorityQueue<Sample> queue = new PriorityQueue<Sample>(comparator);
 			for (int j = 0; j < slist.size(); ++j) {
 				System.out.println("sample " + j);
-				for (int k = 0; k < sampleNum / saveNum; ++k) {
+				for (int k = 0; k < sampleNum / slist.size(); ++k) {
 					slist.get(j).state.load(vData.snodeList);
-					vData.setSkeletonPose(i * groupNum);
+					vData.setSkeletonPose(startFrame + i * groupNum);
+					//vData.setSkeletonPose(0);
 					Sample sample = new Sample();
 					sample.prev = j;
 					getSample(vData.snodeList, sample.dels);
+					
+					for (int t = 0; t < samRate * groupNum; ++t)
+						odeSim.step();
+					
+					/*
 					for (int t = 0; t < samRate; ++t)
 						odeSim.step();
+					*/
 					sample.state.save(vData.snodeList);
-					State target = refList.get(i);
-					sample.cost = cost(sample.state, target);
+					State target = refStateList.get(i);
+					//sample.cost = pCost(sample.state, target);
+					sample.cost = cost(vData.snodeList, refPhyPropList.get(i));
 					// sample.cost = 0;
 					queue.add(sample);
 					if (queue.size() > saveNum)
@@ -266,10 +284,10 @@ public class OdeMocapApp implements SceneGraphNode, Interactor {
 		}
 
 		minSm.get(0).state.load(vData.snodeList);
-		vData.setSkeletonPose(0);
+		vData.setSkeletonPose(startFrame - 1);
 		vRoot.computeTransforms();
 		vRoot.copyEwfrombToPrevious();
-		vData.setSkeletonPose(0);
+		vData.setSkeletonPose(startFrame);
 		vRoot.computeTransforms();
 		odeSim.setCurrentPose(vRoot);
 		odeSim.setCurrentPoseVelocity(vRoot, 0.01);
@@ -279,6 +297,21 @@ public class OdeMocapApp implements SceneGraphNode, Interactor {
 		states.add(tState);
 		for (int i = 1; i < itNum; ++i) {
 			setSample(vData.snodeList, minSm.get(i).dels);
+			
+			/*
+			boolean first = true;
+			for (int j = 0; j < groupNum; ++j) {
+				tState = new State();
+				if (first) {
+					first = false;
+					for (int k = 0; k < samRate; ++k)
+						odeSim.step();
+				}
+				tState.save(vData.snodeList);
+				states.add(tState);
+			}
+			*/
+			
 			for (int j = 0; j < groupNum; ++j) {
 				tState = new State();
 				for (int k = 0; k < samRate; ++k)
@@ -286,6 +319,10 @@ public class OdeMocapApp implements SceneGraphNode, Interactor {
 				tState.save(vData.snodeList);
 				states.add(tState);
 			}
+			
+			
+			
+			System.out.println(minSm.get(i).cost);
 		}
 
 		/*
@@ -295,10 +332,10 @@ public class OdeMocapApp implements SceneGraphNode, Interactor {
 		 * //tmp.state.load(vData.snodeList); }
 		 */
 
-		vData.setSkeletonPose(0);
+		vData.setSkeletonPose(startFrame - 1);
 		vRoot.computeTransforms();
 		vRoot.copyEwfrombToPrevious();
-		vData.setSkeletonPose(0);
+		vData.setSkeletonPose(startFrame);
 		vRoot.computeTransforms();
 		odeSim.setCurrentPose(vRoot);
 		odeSim.setCurrentPoseVelocity(vRoot, 0.01);
@@ -477,7 +514,7 @@ public class OdeMocapApp implements SceneGraphNode, Interactor {
 			stepRequest = false;
 			frame.setValue(frame.getValue() + playSpeed.getValue());
 			if (frame.getValue() == frame.getMaximum()) {
-				frame.setValue(0);
+				frame.setValue(startFrame);
 			}
 
 			doTransition();
@@ -493,8 +530,8 @@ public class OdeMocapApp implements SceneGraphNode, Interactor {
 			 * samples.get(frame.getValue()).state.load(vData.snodeList); }
 			 */
 
-			if (frame.getValue() < states.size()) {
-				states.get(frame.getValue()).load(vData.snodeList);
+			if (frame.getValue() - startFrame < states.size()) {
+				states.get(frame.getValue() - startFrame).load(vData.snodeList);
 			}
 		}
 		fnumber = (int) frame.getValue();
@@ -517,7 +554,7 @@ public class OdeMocapApp implements SceneGraphNode, Interactor {
 		}
 		if (setCurrentPoseRequest || followMocap.getValue()) {
 			setCurrentPoseRequest = false;
-			bvhData.setSkeletonPose((int) Math.max(0, frame.getValue() - 1));
+			bvhData.setSkeletonPose((int) Math.max(startFrame, frame.getValue() - 1));
 			root.computeTransforms();
 			root.copyEwfrombToPrevious();
 			bvhData.setSkeletonPose((int) frame.getValue());
@@ -532,6 +569,9 @@ public class OdeMocapApp implements SceneGraphNode, Interactor {
 			// vRoot.computeTransforms();
 			// odeSim.setCurrentPose(root);
 			// odeSim.setCurrentPoseVelocity(root, 0.01);
+			if (frame.getValue() - startFrame < states.size()) {
+				states.get(frame.getValue() - startFrame).load(vData.snodeList);
+			}
 		}
 
 		GL2 gl = drawable.getGL().getGL2();
@@ -1079,6 +1119,10 @@ public class OdeMocapApp implements SceneGraphNode, Interactor {
 		});
 	}
 
+	double norm(Tuple2d q) {
+		return Math.sqrt(q.x * q.x + q.y * q.y);
+	}
+	
 	double norm(Tuple3d q) {
 		return Math.sqrt(q.x * q.x + q.y * q.y + q.z * q.z);
 	}
@@ -1099,7 +1143,7 @@ public class OdeMocapApp implements SceneGraphNode, Interactor {
 		return Math.sqrt(s * s + norm(v) * norm(v));
 	}
 
-	double cost(State s1, State s2) {
+	double pCost(State s1, State s2) {
 		double a = 0, b = 0;
 		for (int i = 0; i < s1.quat.size(); ++i) {
 			if (s1.quat.get(i) == null || s2.quat.get(i) == null)
@@ -1116,11 +1160,23 @@ public class OdeMocapApp implements SceneGraphNode, Interactor {
 		return a + 0.1 * b;
 	}
 
-	// double cost(List<SkeletonNode> sl1, List<SkeletonNode> sl2) {
+	double cost(List<SkeletonNode> sl, PhyProp phyProp) {
+		double res = 0;
+		int i = 0;
+		for (SkeletonNode a: sl) {
+			if (a.odeBody == null || a.odeBody.body == null)
+				continue;
+			if (a.name.endsWith("Ankle") || a.name.endsWith("Head") || a.name.endsWith("Wrist")) {
+				DVector3C v1 = a.odeBody.body.getPosition();
+				Point3d v2 = phyProp.posList.get(i);
+				res += norm(new Vector3d(v1.get0() - v2.x, v1.get1() - v2.y, v1.get2() - v2.z));
+			}
+			++i;
+		}
+		return res;
+	}
 
-	// }
-
-	double samParaScale = 2;
+	double samParaScale = 5;
 
 	void getSample(List<SkeletonNode> snlist, List<Double> dels) {
 		dels.clear();
@@ -1142,14 +1198,17 @@ public class OdeMocapApp implements SceneGraphNode, Interactor {
 				} else if (chanName.equals("Zrotation")) {
 					ref = sn.zRot;
 				}
-				// double tmp = ref.getValue();
 
-				double tmp = 0;
+				double tmp = ref.getValue();
 				String name = sn.name;
+				double scale = samParaScale;
+				if (chanName.equals("Xrotation"))
+					scale /= 2;
 				if (name.endsWith("Ankle") || name.endsWith("Hip") || name.endsWith("Knee"))
 					do {
-						tmp = ref.getValue() + (Math.random() - 0.5) / samParaScale;
+						tmp = ref.getValue() + (Math.random() - 0.5) / scale;
 					} while (tmp > ref.getMaximum() || tmp < ref.getMinimum());
+				//tmp = ref.getValue();
 				ref.setValue(tmp);
 				dels.add(tmp);
 			}
@@ -1196,6 +1255,7 @@ public class OdeMocapApp implements SceneGraphNode, Interactor {
 class State {
 	List<DQuaternionC> quat = new ArrayList<DQuaternionC>();
 	List<DVector3C> aVel = new ArrayList<DVector3C>();
+	List<DVector3C> pos = new ArrayList<DVector3C>();
 	List<DVector3C> vel = new ArrayList<DVector3C>();
 
 	void save(List<SkeletonNode> snlist) {
@@ -1206,12 +1266,14 @@ class State {
 			if (it.odeBody == null || it.odeBody.body == null) {
 				quat.add(null);
 				aVel.add(null);
+				pos.add(null);
 				vel.add(null);
 			} else {
 				tmp.set(it.odeBody.body.getQuaternion());
 				quat.add(tmp);
 				aVel.add(new DVector3(it.odeBody.body.getAngularVel()));
-				vel.add(new DVector3(it.odeBody.body.getPosition()));
+				pos.add(new DVector3(it.odeBody.body.getPosition()));
+				vel.add(new DVector3(it.odeBody.body.getLinearVel()));
 			}
 		}
 	}
@@ -1222,7 +1284,8 @@ class State {
 				continue;
 			snlist.get(i).odeBody.body.setQuaternion(quat.get(i));
 			snlist.get(i).odeBody.body.setAngularVel(aVel.get(i));
-			snlist.get(i).odeBody.body.setPosition(vel.get(i));
+			snlist.get(i).odeBody.body.setPosition(pos.get(i));
+			snlist.get(i).odeBody.body.setLinearVel(vel.get(i));
 		}
 	}
 }
@@ -1232,4 +1295,19 @@ class Sample {
 	int prev;
 	List<Double> dels = new ArrayList<Double>();
 	double cost;
+}
+
+class PhyProp {
+	List<Point3d> posList = new ArrayList<Point3d>();
+	List<Double> massList = new ArrayList<Double>();
+	
+	PhyProp(List<SkeletonNode> snlist) {
+		for (SkeletonNode sn: snlist) {
+			if (sn.odeBody == null || sn.odeBody.body == null)
+				continue;
+			DVector3C p = sn.odeBody.body.getPosition();
+			posList.add(new Point3d(p.get0(), p.get1(), p.get2()));
+			massList.add(sn.odeBody.body.getMass().getMass());
+		}
+	}
 }
