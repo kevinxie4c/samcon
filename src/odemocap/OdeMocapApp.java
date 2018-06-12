@@ -133,7 +133,7 @@ public class OdeMocapApp implements SceneGraphNode, Interactor {
 
 		// bvhFile = "data/02_02.bvh";
 		//bvhFile = "data/Cyrus_Take7.bvh";
-		bvhFile = "data/walk.bvh";
+		//bvhFile = "data/walk.bvh";
 		bvhData.load(bvhFile);
 
 		// c3dData.load( c3dFile );
@@ -148,14 +148,15 @@ public class OdeMocapApp implements SceneGraphNode, Interactor {
 
 	}
 
-	int sampleNum = 3200, saveNum = 800, itNum = 40;
+	int sampleNum = 3200, saveNum = 800, itNum = 10;
 	//int sampleNum = 1, saveNum = 1, itNum = 20;
-	int groupNum = 5, samRate = 1;
-	int startFrame = 32;
+	int groupNum = 10, samRate = 1;
+	int startFrame = 2;
 	List<State> states;
 
 	@Override
 	public void init(GLAutoDrawable drawable) {
+		long startTime = System.currentTimeMillis();
 		drawable.setGL(new DebugGL2(drawable.getGL().getGL2()));
 		GL2 gl = drawable.getGL().getGL2();
 		gl.glEnable(GL.GL_BLEND);
@@ -350,6 +351,7 @@ public class OdeMocapApp implements SceneGraphNode, Interactor {
 		// pairs.add( new Pair( 2544, 4541 ) );
 
 		// findPairs();
+		System.out.println("Time: " + (System.currentTimeMillis() - startTime));
 	}
 
 	/**

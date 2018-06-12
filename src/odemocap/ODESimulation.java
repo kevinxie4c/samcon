@@ -133,8 +133,8 @@ public class ODESimulation {
      * An amount to lower the floor so that the feet of the character defined in the bvh 
      * are not below the floor to start
      */
-    //public double floorOffset = 0.06;//-0.025;
-    public double floorOffset = -0.01;
+    public double floorOffset = 0.06;//-0.025;
+    //public double floorOffset = -0.01;
     
     /**
      * Creates the world for ODE and initializes objects.
