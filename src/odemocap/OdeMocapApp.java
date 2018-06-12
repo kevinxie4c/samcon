@@ -49,6 +49,8 @@ import mintools.viewer.ShadowMap;
 import org.ode4j.math.*;
 import org.ode4j.ode.DBody;
 
+import java.util.concurrent.*;
+
 /**
  * Assignment 3 base application
  * 
@@ -133,7 +135,7 @@ public class OdeMocapApp implements SceneGraphNode, Interactor {
 
 		// bvhFile = "data/02_02.bvh";
 		//bvhFile = "data/Cyrus_Take7.bvh";
-		bvhFile = "data/walk.bvh";
+		//bvhFile = "data/walk.bvh";
 		bvhData.load(bvhFile);
 
 		// c3dData.load( c3dFile );
@@ -148,14 +150,17 @@ public class OdeMocapApp implements SceneGraphNode, Interactor {
 
 	}
 
-	int sampleNum = 3200, saveNum = 800, itNum = 40;
+	static int sampleNum = 3200, saveNum = 800, itNum = 10;
 	//int sampleNum = 1, saveNum = 1, itNum = 20;
-	int groupNum = 5, samRate = 1;
-	int startFrame = 32;
+	static int groupNum = 10, samRate = 1;
+	static int startFrame = 2;
+	static int coreNum = 4;
 	List<State> states;
 
 	@Override
 	public void init(GLAutoDrawable drawable) {
+		long startTime = System.currentTimeMillis();
+		
 		drawable.setGL(new DebugGL2(drawable.getGL().getGL2()));
 		GL2 gl = drawable.getGL().getGL2();
 		gl.glEnable(GL.GL_BLEND);
@@ -220,6 +225,16 @@ public class OdeMocapApp implements SceneGraphNode, Interactor {
 		vRoot.computeTransforms();
 		odeSim.setCurrentPose(vRoot);
 		odeSim.setCurrentPoseVelocity(vRoot, 0.01);
+		
+		ArrayList<Thread> threads = new ArrayList<Thread>();
+		BlockingQueue<PassingInf> inQueue = new ArrayBlockingQueue<PassingInf>(1024);
+		BlockingQueue<Sample> outQueue = new ArrayBlockingQueue<Sample>(coreNum * 1024);
+		for (int i = 0; i < coreNum; ++i) {
+			Simulator sim = new Simulator(bvhFile, s, drawable, inQueue, outQueue, refStateList, refPhyPropList);
+			Thread thread = new Thread(sim);
+			threads.add(thread);
+			thread.start();
+		}
 
 		ArrayList<ArrayList<Sample>> sm = new ArrayList<ArrayList<Sample>>();
 		ArrayList<Sample> tmplist = new ArrayList<Sample>();
@@ -228,6 +243,7 @@ public class OdeMocapApp implements SceneGraphNode, Interactor {
 		tmpSample.state.save(vData.snodeList);
 		tmplist.add(tmpSample);
 		sm.add(tmplist);
+		int taskNum = 0;
 		for (int i = 1; i < itNum; ++i) {
 			System.out.println("iteration " + i);
 			ArrayList<Sample> slist = sm.get(i - 1);
@@ -235,29 +251,42 @@ public class OdeMocapApp implements SceneGraphNode, Interactor {
 			for (int j = 0; j < slist.size(); ++j) {
 				System.out.println("sample " + j);
 				for (int k = 0; k < sampleNum / slist.size(); ++k) {
-					slist.get(j).state.load(vData.snodeList);
-					vData.setSkeletonPose(startFrame + i * groupNum);
-					//vData.setSkeletonPose(0);
-					Sample sample = new Sample();
-					sample.prev = j;
-					getSample(vData.snodeList, sample.dels);
-					
-					for (int t = 0; t < samRate * groupNum; ++t)
-						odeSim.step();
-					
-					/*
-					for (int t = 0; t < samRate; ++t)
-						odeSim.step();
-					*/
-					sample.state.save(vData.snodeList);
-					State target = refStateList.get(i);
-					//sample.cost = pCost(sample.state, target);
-					sample.cost = cost(vData.snodeList, refPhyPropList.get(i)) + pCost(sample.state, target);
-					// sample.cost = 0;
+					PassingInf inf = new PassingInf();
+					inf.sample = slist.get(j);
+					inf.indexOfPose = i;
+					inf.indexOfSlist = j;
+					try {
+						inQueue.put(inf);
+						++taskNum;
+					} catch (InterruptedException e) {
+						// TODO Auto-generated catch block
+						e.printStackTrace();
+					}
+					try {
+						while (!outQueue.isEmpty()) {
+							Sample sample = outQueue.take();
+							--taskNum;
+							queue.add(sample);
+							if (queue.size() > saveNum)
+								queue.remove();
+						}
+					} catch (InterruptedException e) {
+						// TODO Auto-generated catch block
+						e.printStackTrace();
+					}
+				}
+			}
+			try {
+				while (taskNum > 0) {
+					Sample sample = outQueue.take();
+					--taskNum;
 					queue.add(sample);
 					if (queue.size() > saveNum)
 						queue.remove();
 				}
+			} catch (InterruptedException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
 			}
 			ArrayList<Sample> list = new ArrayList<Sample>();
 			for (Sample it : queue)
@@ -350,6 +379,7 @@ public class OdeMocapApp implements SceneGraphNode, Interactor {
 		// pairs.add( new Pair( 2544, 4541 ) );
 
 		// findPairs();
+		System.out.println("Time: " + (System.currentTimeMillis() - startTime));
 	}
 
 	/**
@@ -1120,19 +1150,19 @@ public class OdeMocapApp implements SceneGraphNode, Interactor {
 		});
 	}
 
-	double norm(Tuple2d q) {
+	static double norm(Tuple2d q) {
 		return Math.sqrt(q.x * q.x + q.y * q.y);
 	}
 	
-	double norm(Tuple3d q) {
+	static double norm(Tuple3d q) {
 		return Math.sqrt(q.x * q.x + q.y * q.y + q.z * q.z);
 	}
 
-	double norm(Tuple4d q) {
+	static double norm(Tuple4d q) {
 		return Math.sqrt(q.w * q.w + q.x * q.x + q.y * q.y + q.z * q.z);
 	}
 
-	double quatDist(DQuaternionC q1, DQuaternionC q2) {
+	static double quatDist(DQuaternionC q1, DQuaternionC q2) {
 		Quat4d qa = new Quat4d(q1.get0(), q1.get1(), q1.get2(), q1.get3());
 		Quat4d qb = new Quat4d(q2.get0(), q2.get1(), q2.get2(), q2.get3());
 		qa.mulInverse(qb);
@@ -1144,7 +1174,7 @@ public class OdeMocapApp implements SceneGraphNode, Interactor {
 		return Math.sqrt(s * s + norm(v) * norm(v));
 	}
 
-	double pCost(State s1, State s2) {
+	static double pCost(State s1, State s2) {
 		double a = 0, b = 0;
 		for (int i = 0; i < s1.quat.size(); ++i) {
 			if (s1.quat.get(i) == null || s2.quat.get(i) == null)
@@ -1167,7 +1197,7 @@ public class OdeMocapApp implements SceneGraphNode, Interactor {
 		return 5.0 * (a + 0.1 * b) / s1.quat.size() + 3.0 * (c + 0.1 * d);
 	}
 
-	double cost(List<SkeletonNode> sl, PhyProp phyProp) {
+	static double cost(List<SkeletonNode> sl, PhyProp phyProp) {
 		double termA = 0;
 		int i = 0;
 		Point3d massPos = new Point3d(0, 0, 0);
@@ -1216,9 +1246,9 @@ public class OdeMocapApp implements SceneGraphNode, Interactor {
 		return 30.0 * termA / 5 + 10.0 * (termB / (1.6 * 5) + 0.1 * norm(massVel));
 	}
 
-	double samParaScale = 5;
+	static double samParaScale = 5;
 
-	void getSample(List<SkeletonNode> snlist, List<Double> dels) {
+	static void getSample(List<SkeletonNode> snlist, List<Double> dels) {
 		dels.clear();
 		for (SkeletonNode sn : snlist) {
 			if (sn.chanlist == null)
@@ -1255,7 +1285,7 @@ public class OdeMocapApp implements SceneGraphNode, Interactor {
 		}
 	}
 
-	void setSample(List<SkeletonNode> snlist, List<Double> dels) {
+	static void setSample(List<SkeletonNode> snlist, List<Double> dels) {
 		int i = 0;
 		for (SkeletonNode sn : snlist) {
 			if (sn.chanlist == null)
@@ -1376,6 +1406,68 @@ class PhyProp {
 				tr.y = 0;
 				r.add(tr);
 			}
+		}
+	}
+}
+
+class PassingInf {
+	Sample sample;
+	int indexOfSlist;
+	int indexOfPose;
+}
+
+class Simulator implements Runnable {
+	ODESimulation sim = new ODESimulation();
+	BVHData bvhData = new BVHData();
+	BlockingQueue<PassingInf> inQueue;
+	BlockingQueue<Sample> outQueue;
+	SkeletonNode root;
+	List<State> refStateList;
+	List<PhyProp> refPhyPropList;
+	
+	public Simulator(String bvhFile, double s, GLAutoDrawable drawable, 
+			BlockingQueue<PassingInf> inQueue, BlockingQueue<Sample> outQueue,
+			List<State> refStateList, List<PhyProp> refPhyPropList) {
+		this.inQueue = inQueue;
+		this.outQueue = outQueue;
+		bvhData.load(bvhFile);
+		root = bvhData.root;
+		if (root != null)
+			root.init(drawable);
+		sim.createSkeleton(root, s);
+		sim.reset();
+		sim.createSkeletonJoints(root);
+		this.refStateList = refStateList;
+		this.refPhyPropList = refPhyPropList;
+	}
+
+	@Override
+	public void run() {
+		// TODO Auto-generated method stub
+		try {
+			while (true) {
+				PassingInf p = inQueue.take();
+				//System.out.println("Simulating...");
+				p.sample.state.load(bvhData.snodeList);
+				bvhData.setSkeletonPose(OdeMocapApp.startFrame + p.indexOfPose * OdeMocapApp.groupNum);
+				Sample sample = new Sample();
+				sample.prev = p.indexOfSlist;
+				OdeMocapApp.getSample(bvhData.snodeList, sample.dels);
+				
+				for (int t = 0; t < OdeMocapApp.samRate * OdeMocapApp.groupNum; ++t) {
+					sim.step();
+				}
+				
+				sample.state.save(bvhData.snodeList);
+				State target = refStateList.get(p.indexOfPose);
+				sample.cost = OdeMocapApp.cost(bvhData.snodeList, refPhyPropList.get(p.indexOfPose)) +
+						OdeMocapApp.pCost(sample.state, target);
+				//System.out.println("done");
+				outQueue.put(sample);
+			}
+		} catch (InterruptedException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
 		}
 	}
 }
